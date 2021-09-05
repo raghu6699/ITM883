@@ -1,0 +1,636 @@
+---
+title: "Happiness Score to Alcohol"
+author: "Madison Borowski, Rithvik Gundavarapu,Raghunath Koilakonda,Rosheen Tahir, Yao Xiao"
+date: "4/6/2021"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r warning = FALSE, message = FALSE, echo = FALSE}
+library(dplyr)
+library(data.table)
+library(ggplot2)
+#library(rsample)
+#library(ggpubr)
+library(GGally)
+#library(caret)
+library(lmtest)
+library(MLmetrics)
+library(car)
+library(readxl)
+library(corrplot)
+library(leaps)
+```
+
+
+**Importing the Data and Looking at the Summary**
+Variable Description:
+
+Country - name of the country
+Region - region the country belongs
+Hemisphere - hemisphere of the country
+HappinessScore - rate of happiness
+HDI - Human Development Index
+GDP_PerCapita - Gross Domestic Product index (per capita)
+Beer_PerCapita - Liters of beer consumptions (per capita)
+Wine_PerCapita - Wine Consumption (per capita)
+Spirit_PerCapita - Consumption of spirits drink (per capita)
+
+
+**For this Analysis, we will be using HappinessScore as our Dependent Variable to see if Alcohol Consumption has an effect on HappinessScore.**
+
+
+
+```{r,echo =FALSE}
+HappinessAlcoholConsumption <- read_excel("C:/Users/madis/OneDrive/Desktop/Business Analytics Problem Solving/Group Project/HappinessAlcoholConsumption.xlsx")
+```
+```{r,echo = FALSE}
+summary(HappinessAlcoholConsumption)
+```
+
+
+**Preparing the Data:**
+
+
+
+```{r}
+#change the name to shorter
+hap = HappinessAlcoholConsumption
+#check to see if there is any na values
+colSums(is.na(hap))
+```
+---
+title: "Two correlation Plots of Happiness Alcohol Consumption:"
+---
+
+1. We used corrplot for the correlation matrix, and only used numeric values.
+
+
+```{r,echo = FALSE}
+HAC = subset(hap, select = c(HappinessScore,GDP_PerCapita,HDI,Beer_PerCapita,Spirit_PerCapita,Wine_PerCapita))
+corrplot(cor(HAC), tl.col = "black")
+
+```
+
+
+2. Values of the correlation:
+
+
+```{r}
+ha = hap[c(4,5,6,7,8,9)]
+
+ggcorr(ha,label = T, layout.exp = 2, hjust = 1)
+
+
+```
+
+Scatter Plot Matrix of the Variables to get a different look of the correlation.
+
+```{r}
+plot(ha[,colnames(ha)])
+```
+**Interpretations**
+
+The independent variables that appear to be the most strongly positively correlated with the 
+Happiness Score for each country : HDI(human development index), Beer_PerCapita, Wine_PerCapita
+
+The independent variables that appear to be the most strongly negatively correlated with the 
+Happiness Score for each country: GDP_PerCapita
+
+Beer_PerCapita and Wine_PerCapita have somewhat strong correlation to Happiness score and too each other as well as to HDI.  So, we should take note of this in our heads to see if this could cause multicollinearity.
+
+
+**Plots of the Data:**
+
+
+
+
+
+**HDI to Happiness Score:**
+
+HDI and Happiness Score have a strong positive correlation. As HDI increases happiness score increases.
+
+
+
+```{r, echo=FALSE}
+ggplot(data=HappinessAlcoholConsumption) +
+  geom_point(mapping = aes(x= HDI, y = HappinessScore), color = "palevioletred1")
+
+
+```
+
+
+
+**HDI to Happiness Score with Region Involved:**
+
+
+We seperate into colors based on Regions, you can tell most regions are in a specific clumps together. Where Western Europe has a high HDI and Happiness Score and SUb-Saharan Africa has a low HDI and low Happiness Score.
+
+
+
+
+```{r, echo=FALSE}
+ggplot(data=HappinessAlcoholConsumption) +
+  geom_point(mapping = aes(x= HDI, y = HappinessScore, color = Region)) + 
+  scale_color_manual(values= c("springgreen","violetred1", "black", "red", "blue", "darkgreen", "pink", "brown", "orange"))
+
+```
+
+
+
+**HDI to Happiness Score with Hemisphere Emphasis:**
+
+Based on the Scatter plot using the color for hemisphere there is no real correlation or difference on hemisphere
+
+```{r, echo=FALSE}
+#Look at Hempisphere
+ggplot(data=HappinessAlcoholConsumption) +
+  geom_point(mapping = aes(x= HDI, y = HappinessScore, color = Hemisphere))
+```
+
+
+**Wine_PerCapita to Happiness Score**
+
+
+```{r, echo=FALSE}
+ggplot(data=HappinessAlcoholConsumption) +
+  geom_point(mapping = aes(x= Wine_PerCapita, y = HappinessScore), color = "palevioletred1")
+
+
+```
+**Beer Per Capita to Happiness Score Based on Region**
+```{r, echo = FALSE}
+ggplot(data=HappinessAlcoholConsumption) +
+  geom_point(mapping = aes(x= Beer_PerCapita, y = HappinessScore, color = Region))
+```
+
+
+
+__BoxPlot of all Numeric Values:__
+
+We can tell that there are lots of outliers for GDP_PerCapita meaning most countries have a lower GDP than a higher one.
+Spirit_percapita and wine_percapita have outliers but not as many as GDP_percapita, so we will look at a scatterplot with GDP per capita and see how many outliers
+
+
+
+
+```{r, echo=FALSE}
+#boxplot
+boxplot(scale(hap %>% select_if(is.numeric)))
+
+```
+
+
+
+**Outliers of GDP_PerCapita:**
+
+As we can tell from the scatterplot, there are 15 points that are above 250 with outliers.
+
+We can take out the 15 values that are outliers for the GDP per capita.
+
+
+
+```{r, echo=FALSE}
+#looking to see what outliers we could take out for high gdp
+
+ggplot(data=HappinessAlcoholConsumption) +
+  geom_point(mapping = aes(x= GDP_PerCapita, y = HappinessScore), color = "palevioletred1")
+#as we can tell from the scatterplot, there are 15 points that are above 250 with outliers
+
+
+```
+
+
+Take out 15 data points to see where they come from.
+So, based on this all of the outliers are in the sub-saharan africa region, if the models turn to be bad with error terms we will take out the 15 values.
+
+
+
+
+**GDP_PerCapia without 15 points**
+
+```{r, echo=FALSE}
+hap[which(hap$GDP_PerCapita >250),]
+
+```
+
+
+
+
+
+
+**Linear Regression Model:**
+
+
+Take out country variable, and change region and hempisphere variables to factors and not characters.
+
+
+
+
+```{r, echo=FALSE}
+#look at the regression model
+#create dummyvariables or move to factors
+hap = hap[-c(1)]
+hap$Region = as.factor(hap$Region)
+hap$Hemisphere = as.factor(hap$Hemisphere)
+```
+
+
+
+
+
+Model1 with all Values:
+
+Based on the fullmodel HDI, Wine Percapita, and a couple regions are statistically significant. With a high rsquared. Showing the model is explained by most of the data. 
+
+
+
+```{r,echo = FALSE}
+model1 = lm(HappinessScore~., data = hap)
+model1
+summary(model1)
+```
+
+
+
+
+Error Assumption Plots:
+based on the error term plots we see the plots are normally distributed in the Normal Q-Q
+ We see in the residuals vs Leverage there are some outliers but none in the 0.5 so this doesn't make it too significant 
+
+
+
+Residual vs Fitted: 
+The points seem to be near the center line although the red line is sloping upward like a "U" a little. Th red line almost follows dotted line 0.
+
+
+Normal Q-Q Plot:
+
+Dots are generally following the y = x line. So, the error terms follow a normal distribution.
+
+
+Scale Location Plot:
+
+We don't have constant variance because the red line isn't following y = 0 is in another "U" formation but not bad enough to where we can't except this model. 
+
+
+Residuals vs. Leverage:
+
+Cooks distance doesn't have any values in 0.5 or 1 so nothing is significantly influential. 
+
+
+```{r,echo = FALSE}
+plot(model1)
+
+```
+
+
+Multicollinearity Model1:
+
+
+
+If we take into account the VIF we see Region has a VIF of 26 which means this variable is highly correlated to another.  The best guess would be to hemisphere since they are farely similar. We will reduce the model and find the best model for model 1 using STEPWISE.
+
+
+
+
+```{r,echo =FALSE}
+vif(model1)
+```
+
+
+
+**NewData Model- GDP <250 **
+
+
+We will create a model with the outliers of the 15 GDP variables to see if this makes a better model. 
+
+
+ 
+ 
+Comparing this model NewModel to Model1 we look at the rsquared and see Model1 has a better rsquared and more variables with low p-values.  We also see the vif has gone down, but we are sacrificing a lower rsquared. Also, based on the residual plots Model1 follows better error terms and is more normally distributed.
+
+
+**We decided based on the numbers we will stick with model1
+
+
+
+
+ 
+```{r,echo = FALSE}
+#we will try and create a subset of values
+
+NewData = hap%>% filter(GDP_PerCapita<250)
+NewData = hap[-c(1)]
+# we will create the model again
+
+NewModel = lm(HappinessScore~.,data = NewData)
+NewModel
+summary(NewModel)
+
+
+
+vif(NewModel)
+
+```
+
+
+
+```{r, echo = FALSE}
+ggplot(data=NewData) +
+  geom_point(mapping = aes(x= GDP_PerCapita, y = HappinessScore), color = "palevioletred1")
+```
+**BestModel for Model1:**
+
+Using the stepwise function for forward and backward we get the equation with the lowest AIC:
+**HappinessScore ~ Region + HDI + Wine_PerCapita**
+
+
+
+```{r,echo = FALSE}
+# We will look at the best model
+#Stepwise function to see the best variables
+bestmodel = step(model1, method = "both")
+
+```
+
+
+
+
+**R-Squared Interpretation**
+
+- 79% of the variability of Happiness Score can be explained by the model.
+
+
+
+**P-value Interpretation**
+- After controlling for all the other independent variables in the model, there is a statistically significant difference between Region of Australia & New Zealand(intercept dummy variable) and Region: Central and Eastern Europe, Eastern Asia, East and Northern Africa, Southeastern Asia, Sub-Saharan Africa that effects the Happiness Score. The p-value is less than 0.05.
+
+- After controlling for Region and Wine_PerCapita there is a statistically significant difference with HDI on Happiness Score.
+
+- After controlling for Region and HDI there is a statistically significant differnce with Wine_PerCapita on Happiness Score.
+
+
+
+**Coefficient Interpretations**
+
+
+
+
+```{r,echo = FALSE}
+summary(bestmodel)
+```
+**Multicollinearity of the Best Model:**
+
+
+The VIF is lower than 10 so this means that there is no multicollinearity in the model.
+
+
+
+```{r, echo = FALSE}
+
+vif(bestmodel)
+
+```
+
+
+**All Subsets Model of FullModel(Model1)**
+
+
+```{r, echo = FALSE}
+bestsubset = regsubsets(HappinessScore~., nbest =3, data = hap)
+sum = summary(bestsubset)
+sum
+
+```
+
+
+```{r,echo =FALSE}
+bestsubset1 = lm(HappinessScore ~ Region + HDI)
+summary(bestsubset1)
+
+```
+
+**Residual Plots of Best Model**
+
+
+
+```{r,echo = FALSE}
+plot(bestmodel)
+```
+
+
+
+
+**BoxCox**
+
+We are looking to see if the data needs to be transformed.
+Since 1 is in the CI we do not transform and 0 is not in so we keep the normal linear regression and do not do any transformation.
+
+
+
+```{r, echo = FALSE}
+library(MASS)
+boxcox(HappinessScore ~., data = hap)
+```
+
+
+
+
+
+
+
+
+
+**Train and Test Data**
+
+
+
+Split data into train and test set approx. 80% in the train and test is 20%.
+
+
+
+
+
+```{r,echo = FALSE}
+
+set.seed(1)
+train.index=sample(1:122,98,replace=FALSE)
+train=hap[train.index,] 
+valid=hap[-train.index,]
+```
+
+
+
+**Train Linear Regression Model**
+
+
+
+```{r,echo = FALSE}
+trainingmodel = lm(HappinessScore~., data = train)
+summary(trainingmodel)
+```
+
+
+
+
+
+Multicollinearity:
+
+
+
+```{r,echo = FALSE}
+vif(trainingmodel)
+
+```
+Based on the VIF looks like we could take ut the region since the vif = 32, We took out the region but the model adjusted r-squared went down to .65. So, we checked by taking out the hemisphere and keeping region since they are highly correlated. When we did that the adjusted r-squared went up to .76
+
+
+
+**TrainModel2 without Hemisphere**
+
+
+
+Taking out Hemisphere and rerunning a new Linear Regression Model 
+```{r,echo = FALSE}
+train = train[-c(2)]
+valid = valid[-c(2)]
+
+trainingmodel2 = lm(HappinessScore~.,data = train)
+summary(trainingmodel2)
+```
+
+
+
+
+
+**Finding BestModel for Train using the stepwise both approach**
+
+
+
+```{r,echo = FALSE}
+trainingmodel3 <- step(trainingmodel2, direction = "both", trace = 0)
+summary(trainingmodel3)
+```
+
+
+
+
+
+
+
+**Model Evaluation**
+
+Looking at the prediction for the step model "trainingmodel3" and the original "trainingmodel2"
+
+Prediction = prediction with the all variables minus hemisphere
+Prediction2 = stepwise model 
+
+
+
+```{r,echo = FALSE}
+#Model Evaluation
+#prediction with all the variables
+prediction = predict(trainingmodel2,newdata = valid)
+prediction
+#prediction with the stepwise of the best model
+prediction2 = predict(trainingmodel3, newdata = valid)
+prediction2
+```
+
+
+
+
+**Model Calculations**
+
+
+
+Calculations of MAPE, RMSE, and MAE based on above model Evaluation
+
+
+
+We may not have enough number of variables but we are checking to see if we can predict the model with only 122 observations
+
+
+These two models MAE,RMSE, MAPE are very similar the step model is a bit better for these error values. Since, the MAPE values are under 10% so this means the model is better able to forecast values.
+
+```{r,echo = FALSE}
+#Calculations of MAPE and RMSE
+
+#we may not have enough number of variables but we are checking to see if we can predict the model with only 122 observations
+library(MLmetrics)
+all_variables = data.frame(MAE = MAE(prediction,valid$HappinessScore),
+                          RMSE = RMSE(prediction,valid$HappinessScore),
+                          MAPE = MAPE(prediction,valid$HappinessScore))
+withbetter_model = data.frame(MAE = MAE(prediction2,valid$HappinessScore),
+                              RMSE = RMSE(prediction2,valid$HappinessScore),
+                              MAPE = MAPE(prediction2,valid$HappinessScore))
+
+rbind(all_variables= all_variables,withbetter_model = withbetter_model)
+
+```
+
+
+
+**Heteroskedasticity**
+
+The test statistic is 1.3 and the corresponding p-value is 0.86. Since the p-value is not less than 0.05, we fail to reject the null hypothesis. We do not have sufficient evidence to say heteroskedasticity is present in the model.
+
+
+
+
+```{r,echo =FALSE}
+#Look for heteroskedasticity
+#if unequal variation there is heteroskedasticity
+bptest(trainingmodel3)
+```
+
+
+
+
+**Normality**
+
+The p-value is greater than 0.05 so we fail to reject the Shapiro test(normality). We can say the model is normally distributed based on the p-value is 0.4.
+
+
+
+
+
+```{r,echo = FALSE}
+#Normality: normally distributed so we want the residuals near the zero value
+shapiro.test(trainingmodel3$residuals)
+
+
+```
+
+
+
+
+**Multicollinearity**
+
+Vif in both models is below 10 so we can conclude that multicollinearity of models is small. So, these independent variables in the two models are not very similar.  
+
+```{r, echo = FALSE}
+#Multicollinearity
+#using vif to see if some variables are too related
+#if above 10 most likely high collinearlity
+vif(trainingmodel2)
+vif(trainingmodel3)
+
+plot(trainingmodel3)
+```
+
+
+
+
+**Conclusion**
+
+
+
+
